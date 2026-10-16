@@ -1,0 +1,43 @@
+/** Cloudflare Pages Function: verifies LINE ID token then HMAC-signs the GAS request.
+ * Never expose LINE_CHANNEL_ID, GAS_URL or GAS_SHARED_SECRET to the browser.
+ */
+const msg=(error,status=400)=>Response.json({ok:false,error},{status,headers:{'Cache-Control':'no-store'}});
+const enc = new TextEncoder();
+async function hmac(secret,data) {
+  const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const b=new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(data)));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+}
+export async function onRequestPost({request,env}) {
+  if(!env.LINE_CHANNEL_ID||!env.GAS_URL||!env.GAS_SHARED_SECRET) return msg('SERVER_NOT_CONFIGURED',503);
+  if(env.GAS_SHARED_SECRET.length<32)return msg('SECRET_TOO_SHORT',503);
+  const length=Number(request.headers.get('content-length')||0);
+  if(length>20000)return msg('REQUEST_TOO_LARGE',413);
+  const auth=request.headers.get('authorization')||'';
+  const token=auth.startsWith('Bearer ')?auth.slice(7):'';
+  if(!token||token.length>10000)return msg('LOGIN_REQUIRED',401);
+  let input;
+  try { const raw=await request.text();if(raw.length>20000)return msg('REQUEST_TOO_LARGE',413);input=JSON.parse(raw); }
+  catch {return msg('INVALID_JSON');}
+  if(typeof input.action!=='string'||!input.action||typeof input.data!=='object'||input.data===null||Array.isArray(input.data))return msg('INVALID_REQUEST');
+  let verified;
+  try {
+    const form=new URLSearchParams({id_token:token,client_id:env.LINE_CHANNEL_ID});
+    const vr=await fetch('https://api.line.me/oauth2/v2.1/verify',{method:'POST',body:form,headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+    if(!vr.ok)return msg('LINE_TOKEN_INVALID',401);
+    verified=await vr.json();
+    if(verified.aud!==env.LINE_CHANNEL_ID||!/^U[0-9a-f]{32}$/i.test(String(verified.sub||'')))return msg('LINE_TOKEN_INVALID',401);
+  } catch {return msg('LINE_VERIFY_UNAVAILABLE',503);}
+  const body=JSON.stringify({action:input.action,data:input.data,actor:{uid:verified.sub,name:verified.name||''}});
+  const ts=Date.now().toString(),nonce=crypto.randomUUID();
+  const sig=await hmac(env.GAS_SHARED_SECRET,`${ts}\n${nonce}\n${body}`);
+  try {
+    const r=await fetch(env.GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ts,nonce,body,sig}),redirect:'follow'});
+    if(!r.ok)return msg('GAS_UNAVAILABLE_'+r.status,502);
+    const responseText=await r.text();
+    let data;
+    try {data=JSON.parse(responseText);}catch{return msg('GAS_INVALID_RESPONSE',502);}
+    if(typeof data.ok!=='boolean')return msg('GAS_INVALID_RESPONSE',502);
+    return Response.json(data,{headers:{'Cache-Control':'no-store'}});
+  }catch{return msg('GAS_NETWORK_ERROR',502);}
+}

@@ -2,6 +2,18 @@
  * Never expose LINE_CHANNEL_ID, GAS_URL or GAS_SHARED_SECRET to the browser.
  */
 const msg=(error,status=400)=>Response.json({ok:false,error},{status,headers:{'Cache-Control':'no-store'}});
+// Translate LINE's public verification error categories into safe, actionable codes.
+// Never return or log ID tokens, user IDs, JWT payloads, or LINE's raw response.
+function lineVerifyError(status, payload) {
+  const detail=String(payload && payload.error_description || '');
+  if (/Invalid IdToken Audience/i.test(detail)) return 'LINE_AUDIENCE_MISMATCH';
+  if (/IdToken expired/i.test(detail)) return 'LINE_ID_TOKEN_EXPIRED';
+  if (/Invalid IdToken Issuer/i.test(detail)) return 'LINE_ID_TOKEN_ISSUER_INVALID';
+  if (/Invalid IdToken Nonce/i.test(detail)) return 'LINE_ID_TOKEN_NONCE_INVALID';
+  if (/Invalid IdToken Subject Identifier/i.test(detail)) return 'LINE_ID_TOKEN_SUBJECT_INVALID';
+  if (/Invalid IdToken/i.test(detail)) return 'LINE_ID_TOKEN_REJECTED';
+  return 'LINE_VERIFY_HTTP_'+String(status);
+}
 const enc = new TextEncoder();
 async function hmac(secret,data) {
   const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -24,9 +36,13 @@ export async function onRequestPost({request,env}) {
   try {
     const form=new URLSearchParams({id_token:token,client_id:env.LINE_CHANNEL_ID});
     const vr=await fetch('https://api.line.me/oauth2/v2.1/verify',{method:'POST',body:form,headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    if(!vr.ok)return msg('LINE_TOKEN_INVALID',401);
+    if(!vr.ok){
+      const problem=await vr.json().catch(()=>({}));
+      return msg(lineVerifyError(vr.status,problem),401);
+    }
     verified=await vr.json();
-    if(verified.aud!==env.LINE_CHANNEL_ID||!/^U[0-9a-f]{32}$/i.test(String(verified.sub||'')))return msg('LINE_TOKEN_INVALID',401);
+    if(String(verified.aud||'')!==String(env.LINE_CHANNEL_ID))return msg('LINE_AUDIENCE_MISMATCH',401);
+    if(!/^U[0-9a-f]{32}$/i.test(String(verified.sub||'')))return msg('LINE_USER_ID_FORMAT_UNEXPECTED',401);
   } catch {return msg('LINE_VERIFY_UNAVAILABLE',503);}
   const body=JSON.stringify({action:input.action,data:input.data,actor:{uid:verified.sub,name:verified.name||''}});
   const ts=Date.now().toString(),nonce=crypto.randomUUID();

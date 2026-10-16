@@ -31,8 +31,11 @@ export async function onRequestPost({request,env}) {
   const body=JSON.stringify({action:input.action,data:input.data,actor:{uid:verified.sub,name:verified.name||''}});
   const ts=Date.now().toString(),nonce=crypto.randomUUID();
   const sig=await hmac(env.GAS_SHARED_SECRET,`${ts}\n${nonce}\n${body}`);
+  // Independent proof to classify key/runtime mismatch vs. payload mismatch.
+  // This value is sent only server-to-server. It never exposes the secret.
+  const proof=await hmac(env.GAS_SHARED_SECRET,`GUPPY_HMAC_PROOF_V1\n${ts}\n${nonce}`);
   try {
-    const r=await fetch(env.GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ts,nonce,body,sig}),redirect:'follow'});
+    const r=await fetch(env.GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ts,nonce,body,sig,proof}),redirect:'follow'});
     if(!r.ok)return msg('GAS_UNAVAILABLE_'+r.status,502);
     const responseText=await r.text();
     let data;

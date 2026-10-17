@@ -44,7 +44,11 @@ export async function onRequestPost({request,env}) {
     if(String(verified.aud||'')!==String(env.LINE_CHANNEL_ID))return msg('LINE_AUDIENCE_MISMATCH',401);
     if(!/^U[0-9a-f]{32}$/i.test(String(verified.sub||'')))return msg('LINE_USER_ID_FORMAT_UNEXPECTED',401);
   } catch {return msg('LINE_VERIFY_UNAVAILABLE',503);}
-  const body=JSON.stringify({action:input.action,data:input.data,actor:{uid:verified.sub,name:verified.name||''}});
+  // Always sign ASCII-only JSON to avoid Unicode decoding/encoding differences
+  // between Cloudflare WebCrypto and Apps Script e.postData.contents.
+  // JSON.parse on the GAS side restores the exact same Chinese/emoji strings.
+  const body=JSON.stringify({action:input.action,data:input.data,actor:{uid:verified.sub,name:verified.name||''}})
+    .replace(/[\u007f-\uffff]/g,ch=>'\\u'+ch.charCodeAt(0).toString(16).padStart(4,'0'));
   const ts=Date.now().toString(),nonce=crypto.randomUUID();
   const sig=await hmac(env.GAS_SHARED_SECRET,`${ts}\n${nonce}\n${body}`);
   // Independent proof to classify key/runtime mismatch vs. payload mismatch.

@@ -7,3 +7,54 @@
 .payroll-overview strong{font-size:25px;color:#153469}
 .list-item .actions{justify-content:end}
 @media(max-width:650px){.nav-item{font-size:10px}.list-item{flex-wrap:wrap}.list-item .actions{width:100%}.list-item .actions>*{flex:1}}
+
+/* Guppy HR 1.1.2 - published personal month schedule */
+.schedule-panel{padding:clamp(14px,3vw,24px)}
+.schedule-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.schedule-nav,.schedule-tools,.schedule-pickers{display:flex;align-items:center;gap:8px}
+.schedule-pickers label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#60758f}
+.schedule-pickers select{appearance:none;border:1px solid #dce7f1;border-radius:11px;padding:9px 25px 9px 11px;background:#f8fbff;color:#14366c;font-weight:750;cursor:pointer}
+.schedule-arrow{border:1px solid #dfe9f5;background:#fff;color:#173472;border-radius:12px;min-width:38px;height:42px;font-size:26px;line-height:1;display:grid;place-items:center}
+.schedule-arrow:hover,.schedule-arrow:focus-visible{background:#e9f6ff}
+.schedule-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;border-radius:13px;background:#eff5fa;padding:4px;margin:18px 0 15px}
+.schedule-switch button{border:0;border-radius:10px;padding:10px;background:transparent;color:#60758f;font-weight:750}
+.schedule-switch button.active{background:#fff;color:#173472;box-shadow:0 2px 6px #17347217}
+.schedule-tally{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 17px}
+.schedule-tally>div{background:#f2f8fd;padding:14px;border-radius:13px;display:flex;flex-direction:column;gap:4px}
+.schedule-tally span{font-size:12px;color:#69829b}
+.schedule-tally strong{font-size:23px;color:#173472;line-height:1.3}
+.schedule-tally small{font-size:12px;font-weight:500}
+.schedule-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.schedule-week-label{text-align:center;font-size:12px;font-weight:800;color:#8292a9;padding:5px 0 8px}
+.schedule-date{min-width:0;min-height:78px;border:1px solid #e8eef5;background:#fff;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:start;padding:7px 2px;gap:4px;position:relative;color:#45617e;transition:background .12s,border-color .12s}
+.schedule-date:hover{background:#edf8fc}
+.schedule-date.selected{background:#ebf7ff;border:2px solid #2198ca;padding:6px 1px;box-shadow:0 2px 7px #2198ca20}
+.schedule-date.current .schedule-date-number{background:#173472;color:white;border-radius:50%;width:25px;height:25px;display:grid;place-items:center}
+.schedule-date-number{font-size:14px;font-weight:750;line-height:25px;height:25px}
+.schedule-date-time{background:#d6f0fa;color:#10678e;font-size:10px;font-weight:750;padding:2px 3px;border-radius:4px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.schedule-date-empty{font-size:11px;color:#bec7d3;line-height:17px}
+.schedule-dot{background:#28a7cd;width:5px;height:5px;border-radius:50%;margin-top:1px}
+.schedule-count{color:#14739d;font-size:10px;font-weight:700}
+.schedule-blank{min-height:78px}
+.schedule-selected{margin-top:18px;padding:16px;border-radius:16px;background:#f4f8fd;border:1px solid #e8f0f8}
+.schedule-selected-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px}
+.schedule-selected-head strong{color:#193d69;font-size:15px}.schedule-selected-head span{font-size:12px;color:#7a90a4}
+.schedule-shift-line{display:flex;align-items:center;gap:11px;background:white;border:1px solid #e4eef7;border-radius:11px;padding:11px;margin-top:8px}
+.schedule-shift-icon{background:#dff2fa;color:#1583ae;border-radius:10px;width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;font-size:19px}
+.schedule-shift-line strong{display:block;font-size:14px;color:#173472}
+.schedule-shift-line small{display:block;color:#7891a9;font-size:11px}
+.schedule-empty-day{font-size:12px;line-height:1.7;margin:3px 0;color:#758b9f}
+.schedule-no-published{display:flex;flex-direction:column;align-items:center;text-align:center;padding:32px 18px;gap:9px;color:#66809d}
+.schedule-no-published>span{font-size:30px;color:#7db6d1}
+.schedule-no-published strong{color:#173472}.schedule-no-published p{font-size:13px;margin:0}
+.schedule-unpublished{margin-top:12px;padding:11px;border-radius:11px;background:#fff9e7;color:#896d25;font-size:12px}
+.schedule-list{display:grid;gap:12px}.schedule-list-group{border-bottom:1px solid #edf1f7;padding-bottom:11px}
+.schedule-list-day{font-size:14px;font-weight:800;color:#244574;margin-bottom:8px}
+.schedule-list-day small{font-size:11px;color:#8b9fb2;margin-left:7px}
+.schedule-loading{min-height:240px;display:flex;flex-direction:column;gap:14px;justify-content:center;align-items:center;text-align:center;font-size:13px;color:#68819a}
+.schedule-loading p{margin:0}.schedule-loading strong{color:#173472}
+.schedule-footer,.schedule-week-hint{font-size:12px;color:#8095aa;line-height:1.7;margin-top:13px}
+.schedule-week-hint{margin-top:8px}
+.schedule-panel button:focus-visible,.schedule-panel select:focus-visible{outline:3px solid #3ca8d5;outline-offset:2px}
+@media(max-width:560px){.schedule-toolbar{align-items:stretch;gap:10px}.schedule-nav{justify-content:space-between}.schedule-pickers{flex:1;justify-content:center;gap:8px}.schedule-pickers label{gap:4px}.schedule-pickers select{padding:8px 19px 8px 7px;font-size:13px}.schedule-tools{justify-content:flex-end}.schedule-date,.schedule-blank{min-height:68px}.schedule-date{padding:5px 1px;gap:1px;border-radius:9px}.schedule-date.selected{padding:4px 0}.schedule-date-number{font-size:12px}.schedule-date-time{font-size:9px;padding:1px 2px}.schedule-month-grid{gap:3px}.schedule-tally strong{font-size:20px}}
+@media(prefers-reduced-motion:reduce){.schedule-date,.schedule-switch button{transition:none}}

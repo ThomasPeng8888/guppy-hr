@@ -1,30 +1,33 @@
-/* Guppy HR Phase 1.1.1 RC | LINE LIFF mobile-first interface */
+/* Guppy HR Phase 1.1.2 · Monthly Schedule | LINE LIFF mobile-first interface */
 (() => {
   'use strict';
   const root=document.querySelector('#app'),nav=document.querySelector('#nav'),role=document.querySelector('#role');
   let token='',state=null,page='home',busy=false,toastTimer,payroll=null,payrollMonth=nowMonth();
+  let scheduleMonth=nowMonth(),scheduleView='calendar',scheduleDay='',scheduleError='';
+  const monthCache=new Map(),monthRequests=new Map(),monthGenerations=new Map(),MONTH_TTL_MS=120000;
   function nowMonth(){const f=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());const p=Object.fromEntries(f.map(x=>[x.type,x.value]));return `${p.year}-${p.month}`;}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const tDate=v=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v));
   const tTime=v=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(v));
   const dateKey=v=>{const f=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(v));const p=Object.fromEntries(f.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;};
   const nowKey=()=>dateKey(new Date());
+  scheduleDay=nowKey();
   const localISO=v=>v?new Date(v+':00+08:00').toISOString():'';
   const text=(v)=>safe(v||'—');
   const showToast=(s)=>{let n=document.querySelector('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.classList.remove('show'),4800);};
-  const errMap={INVALID_CLOCK_SEQUENCE:'目前打卡順序不正確，請先結束休息或完成上班。',EVENT_SEQUENCE_CONFLICT:'打卡紀錄順序異常，請由管理員覆核。',CORRECTION_SEQUENCE_CONFLICT:'補卡可能讓出勤順序出錯，請檢查時間。',PAYROLL_UNRESOLVED_EXCEPTIONS:'有未解決的出勤、薪資或法規異常，暫時不能封存。',PAYROLL_PREVIEW_CHANGED:'薪資資料已變動，請重新試算。',PAYROLL_SNAPSHOT_TOO_LARGE:'本月薪資明細超過 Google Sheets 單格容量，請聯絡管理者處理後再封存。',CLOSED_PAYROLL_COMPENSATION_HISTORY:'生效月份已封存，不可追溯變更薪資。',PAYROLL_PERIOD_CLOSED:'此月份已完成薪資封存，不可直接修改原始紀錄。',BELOW_MINIMUM_HOURLY_WAGE:'設定時薪低於生效日期的法定最低工資。',COMPENSATION_DATE_MUST_INCREASE:'新薪資生效日必須晚於上一筆設定。',SELF_APPROVAL_NOT_ALLOWED:'不可簽核自己的申請。',NOT_REGISTERED:'您的 LINE 帳號尚未建立員工資料。',NO_PERMISSION:'您沒有執行此操作的權限。',WORKSITE_NOT_CALIBRATED:'管理者尚未完成工作室 GPS 校準。',LOW_GPS_ACCURACY:'目前 GPS 誤差過大，請走到開闊處重新定位。',OUTSIDE_WORKSITE:'定位顯示您不在工作室允許打卡的範圍內。',STALE_GPS:'定位資料已逾時，請重新定位。',ALREADY_CLOCKED_IN:'您目前已經上班打卡，請使用下班打卡。',NOT_CLOCKED_IN:'目前沒有尚未結束的上班打卡。',SERVER_BUSY:'目前伺服器忙碌，請稍後再試。',EXPIRED_REQUEST:'連線逾時，請重試。',BAD_SIGNATURE:'後端驗證設定有誤，請聯絡管理者。',LINE_TOKEN_INVALID:'LINE 登入已失效，請重新開啟系統。',INVALID_CALIBRATION:'GPS 誤差過高，無法完成校準。',SHIFT_OVERLAP:'員工已有時間重疊的班表。',CORRECTION_SEQUENCE_CONFLICT:'此補卡會造成上下班事件順序衝突，請檢查補卡時間及既有紀錄。',EMPLOYEE_EXISTS:'此 LINE 帳號已經有員工資料。',BAD_CORRECTION:'請完整填寫補卡類別、時間與至少 5 個字的原因。',BAD_CORRECTION_DATE:'補卡日期超出可申請範圍（過去 30 天）。'};
+  const errMap={INVALID_CLOCK_SEQUENCE:'目前打卡順序不正確，請先結束休息或完成上班。',EVENT_SEQUENCE_CONFLICT:'打卡紀錄順序異常，請由管理員覆核。',CORRECTION_SEQUENCE_CONFLICT:'補卡可能讓出勤順序出錯，請檢查時間。',PAYROLL_UNRESOLVED_EXCEPTIONS:'有未解決的出勤、薪資或法規異常，暫時不能封存。',PAYROLL_PREVIEW_CHANGED:'薪資資料已變動，請重新試算。',PAYROLL_SNAPSHOT_TOO_LARGE:'本月薪資明細超過 Google Sheets 單格容量，請聯絡管理者處理後再封存。',CLOSED_PAYROLL_COMPENSATION_HISTORY:'生效月份已封存，不可追溯變更薪資。',PAYROLL_PERIOD_CLOSED:'此月份已完成薪資封存，不可直接修改原始紀錄。',BELOW_MINIMUM_HOURLY_WAGE:'設定時薪低於生效日期的法定最低工資。',COMPENSATION_DATE_MUST_INCREASE:'新薪資生效日必須晚於上一筆設定。',SELF_APPROVAL_NOT_ALLOWED:'不可簽核自己的申請。',INVALID_SCHEDULE_MONTH:'年月格式不正確，請重新選擇。',NOT_REGISTERED:'您的 LINE 帳號尚未建立員工資料。',NO_PERMISSION:'您沒有執行此操作的權限。',WORKSITE_NOT_CALIBRATED:'管理者尚未完成工作室 GPS 校準。',LOW_GPS_ACCURACY:'目前 GPS 誤差過大，請走到開闊處重新定位。',OUTSIDE_WORKSITE:'定位顯示您不在工作室允許打卡的範圍內。',STALE_GPS:'定位資料已逾時，請重新定位。',ALREADY_CLOCKED_IN:'您目前已經上班打卡，請使用下班打卡。',NOT_CLOCKED_IN:'目前沒有尚未結束的上班打卡。',SERVER_BUSY:'目前伺服器忙碌，請稍後再試。',EXPIRED_REQUEST:'連線逾時，請重試。',BAD_SIGNATURE:'後端驗證設定有誤，請聯絡管理者。',LINE_TOKEN_INVALID:'LINE 登入已失效，請重新開啟系統。',INVALID_CALIBRATION:'GPS 誤差過高，無法完成校準。',SHIFT_OVERLAP:'員工已有時間重疊的班表。',CORRECTION_SEQUENCE_CONFLICT:'此補卡會造成上下班事件順序衝突，請檢查補卡時間及既有紀錄。',EMPLOYEE_EXISTS:'此 LINE 帳號已經有員工資料。',BAD_CORRECTION:'請完整填寫補卡類別、時間與至少 5 個字的原因。',BAD_CORRECTION_DATE:'補卡日期超出可申請範圍（過去 30 天）。'};
   async function api(action,data={}){
     const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),30000);
     try{const r=await fetch('/api/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action,data}),signal:ctrl.signal});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'NETWORK_ERROR');return j.result;}
     finally{clearTimeout(timer);}
   }
-  async function mutate(action,data,ok){if(busy)return;busy=true;try{const result=await api(action,data);showToast(ok||'操作成功');state=await api('bootstrap');render();return result;}catch(e){showToast(errMap[e.message]||`操作失敗：${e.message}`);}finally{busy=false;}}
+  async function mutate(action,data,ok){if(busy)return;busy=true;try{const result=await api(action,data);showToast(ok||'操作成功');state=await api('bootstrap');monthCache.clear();render();if(page==='schedule')loadScheduleMonth(scheduleMonth,true);return result;}catch(e){showToast(errMap[e.message]||`操作失敗：${e.message}`);}finally{busy=false;}}
   async function reload(){state=await api('bootstrap');render();}
   const isAdmin=()=>state&&state.registered&&state.me.role==='ADMIN';
   const myEvents=()=>((state&&state.events)||[]).filter(e=>e.employeeId===state.me.employeeId).sort((a,b)=>new Date(a.effectiveAt)-new Date(b.effectiveAt));
   const currentShiftState=()=>{const es=myEvents();const k=es.length?es[es.length-1].kind:'OUT';return k==='IN'||k==='BREAK_END'?'WORK':k==='BREAK_START'?'BREAK':'OFF';};
   const eventLabels={IN:'上班打卡',BREAK_START:'休息開始',BREAK_END:'休息結束',OUT:'下班打卡'};
-  const todayShift=()=>{const shifts=(state.shifts||[]).filter(s=>s.employeeId===state.me.employeeId && s.status!=='CANCELLED');const today=nowKey();return shifts.find(s=>dateKey(s.startAt)===today)||null;};
+  const todayShift=()=>{const shifts=(state.shifts||[]).filter(s=>s.employeeId===state.me.employeeId && s.status==='PUBLISHED');const today=nowKey();return shifts.find(s=>dateKey(s.startAt)===today)||null;};
   const asItem=(a,b,right='')=>`<div class="list-item"><div><div class="title">${a}</div><small>${b}</small></div>${right}</div>`;
   function render(){
     if(!state){return;}
@@ -36,25 +39,79 @@
     if(['admin','approvals','payroll'].includes(page)&&!isAdmin())page='home';
     const tabs=[['home','⌂','首頁'],['schedule','▦','班表'],['attendance','◷','出勤'],...(isAdmin()?[['approvals','☑','簽核'],['payroll','＄','薪資'],['admin','⚙','管理']]:[])];
     nav.innerHTML=tabs.map(([key,ico,label])=>`<button class="nav-item ${page===key?'active':''}" data-page="${key}"><span class="nav-icon">${ico}</span><span>${label}</span></button>`).join('');
-    nav.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{page=x.dataset.page;render();window.scrollTo({top:0,behavior:'smooth'});});
+    nav.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
     root.innerHTML=page==='home'?home():page==='schedule'?schedule():page==='attendance'?attendance():page==='approvals'?approvals():page==='payroll'?payrollView():admin();
     bind();
   }
   function header(title,sub){return `<div class="heading"><div><span class="overline">GUPPY HR · ${page.toUpperCase()}</span><h1>${title}</h1><p>${sub}</p></div></div>`;}
   function home(){const sh=todayShift(),current=currentShiftState(),site=state.worksite,es=myEvents().filter(e=>dateKey(e.effectiveAt)===nowKey());
-    const shift=sh?`${tTime(sh.startAt)} – ${tTime(sh.endAt)}`:'今日未安排班表';
+    const shift=sh?`${tTime(sh.startAt)} – ${tTime(sh.endAt)}`:'今日尚無已發布班別';
     return `${header('今天也辛苦了，'+safe(state.me.name)+'！','小小水族日常，由每一次用心開始。')}
       <section class="hero"><span class="overline" style="color:#acd9ec">TODAY · ${tDate(new Date())}</span><h2>${current==='OFF'?'準備好開始今天的工作嗎？':current==='BREAK'?'休息中，回到工作室再打卡':'您目前正在上班'}</h2><div class="shift"><span>今日班別</span><b>${shift}</b></div><div class="hero-actions">${current==='OFF'?'<button class="btn primary" data-clock="IN">◎ GPS 上班打卡</button>':current==='WORK'?'<button class="btn white" data-clock="BREAK_START">☕ GPS 休息開始</button><button class="btn outline-light" data-clock="OUT">◷ GPS 下班打卡</button>':'<button class="btn white" data-clock="BREAK_END">◎ GPS 休息結束</button>'}</div></section>
       ${!site.enabled||site.latitude===null?'<div class="notice warn">⚠ 工作室 GPS 中心尚未完成校準，目前不能正式打卡。請通知管理者。</div>':`<div class="notice">📍 GPS 打卡地點：${safe(site.address)} · 半徑 ${site.radius}m · 定位誤差須 ≤ ${site.maxAccuracy}m</div>`}
-      <div class="grid" style="margin-top:16px"><div class="card stat"><div><span>今天打卡次數</span><br><strong>${es.length}</strong></div><span>次</span></div><div class="card stat"><div><span>我的本月排班</span><br><strong>${state.shifts.filter(x=>x.employeeId===state.me.employeeId && x.status!=='CANCELLED' && dateKey(x.startAt).slice(0,7)===nowKey().slice(0,7)).length}</strong></div><span>班</span></div></div>
-      <div class="section-title"><h2>本週排班</h2><span class="subtitle">台灣時間</span></div>${week()}
+      <div class="grid" style="margin-top:16px"><div class="card stat"><div><span>今天打卡次數</span><br><strong>${es.length}</strong></div><span>次</span></div><div class="card stat"><div><span>我的本月排班</span><br><strong>${state.shifts.filter(x=>x.employeeId===state.me.employeeId && x.status==='PUBLISHED' && dateKey(x.startAt).slice(0,7)===nowKey().slice(0,7)).length}</strong></div><span>班</span></div></div>
+      <div class="section-title"><h2>本週排班</h2><button class="btn small outline" data-pagego="schedule">查看年月班表 →</button></div>${week()}
       <div class="section-title"><h2>今日打卡紀錄</h2><button class="btn small outline" data-pagego="attendance">全部紀錄 →</button></div><section class="card">${es.length?es.slice().reverse().map(e=>asItem(eventLabels[e.kind]||e.kind,e.source==='GPS_LIFF'?'GPS 定位成功':'主管核准補卡',`<strong>${tTime(e.effectiveAt)}</strong>`)).join(''):'<p class="subtle">今天尚無打卡紀錄。</p>'}</section>`;
   }
-  function week(){const today=nowKey(),dt=new Date(today+'T00:00:00+08:00'),dow=(new Date(today+'T12:00:00+08:00').getUTCDay()+6)%7,monday=new Date(dt.getTime()-dow*86400000);const own=state.shifts.filter(s=>s.employeeId===state.me.employeeId&&s.status!=='CANCELLED');
-    return `<div class="week">${Array.from({length:7},(_,i)=>{const day=new Date(monday.getTime()+i*86400000),key=dateKey(day),sh=own.find(s=>dateKey(s.startAt)===key);return `<div class="day ${today===key?'today':''} ${!sh?'off':''}"><small>${['一','二','三','四','五','六','日'][i]}</small><b>${Number(key.slice(-2))}</b><em>${sh?tTime(sh.startAt):'休'}</em></div>`;}).join('')}</div>`;
+  // Current week is already part of the authenticated bootstrap window. Drafts
+  // are deliberately NOT displayed as committed shifts for an employee.
+  function week(){
+    const today=nowKey(),dt=new Date(today+'T00:00:00+08:00'),dow=(new Date(today+'T12:00:00+08:00').getUTCDay()+6)%7,monday=new Date(dt.getTime()-dow*86400000);
+    const own=state.shifts.filter(s=>s.employeeId===state.me.employeeId&&s.status==='PUBLISHED');
+    return `<div class="week">${Array.from({length:7},(_,i)=>{const day=new Date(monday.getTime()+i*86400000),key=dateKey(day),sh=own.filter(s=>dateKey(s.startAt)===key).sort((x,y)=>new Date(x.startAt)-new Date(y.startAt));return `<div class="day ${today===key?'today':''} ${!sh.length?'off':''}"><small>${['一','二','三','四','五','六','日'][i]}</small><b>${Number(key.slice(-2))}</b><em>${sh.length?(tTime(sh[0].startAt)+(sh.length>1?' +'+(sh.length-1):'')):'—'}</em></div>`;}).join('')}</div><p class="schedule-week-hint">「—」代表目前無已發布班別，不代表已核定休假。</p>`;
   }
-  function schedule(){const list=state.shifts.filter(s=>s.employeeId===state.me.employeeId&&s.status!=='CANCELLED').sort((a,b)=>new Date(a.startAt)-new Date(b.startAt));
-    return `${header('我的班表','查看已安排的班別與未來工作時間。')}${week()}<div class="section-title"><h2>班表明細</h2></div><section class="card">${list.length?list.map(s=>asItem(`${tDate(s.startAt)} ${tTime(s.startAt)} – ${tTime(s.endAt)}`,s.status==='DRAFT'?'草稿（尚未正式發布）':'已發布',`<span class="tag">${s.status==='PUBLISHED'?'正式':'草稿'}</span>`)).join(''):'<p class="subtle">目前沒有近期班表。</p>'}</section><div class="notice">所有班表與時間皆以台灣時間顯示。發布後的班表才視為正式班表。</div>`;
+  // Taiwan year/month logic does not depend on the device's local timezone.
+  function monthShift(month,delta){const [y,m]=month.split('-').map(Number);const d=new Date(Date.UTC(y,m-1+delta,1));return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');}
+  const monthValid=m=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(m);
+  function dayInMonth(month){const today=nowKey();return today.slice(0,7)===month?today:month+'-01';}
+  function setScheduleMonth(next){
+    if(!monthValid(next)||next<'2020-01'||next>'2099-12')return showToast('可查詢 2020 至 2099 年的年月。');
+    if(scheduleMonth===next)return;
+    scheduleMonth=next;scheduleDay=dayInMonth(next);scheduleError='';
+    render();loadScheduleMonth(next);
+  }
+  function openPage(next){page=next;render();window.scrollTo({top:0,behavior:'smooth'});if(next==='schedule')loadScheduleMonth(scheduleMonth);}
+  function cachedMonth(month){const entry=monthCache.get(month);return entry&&Date.now()-entry.at<MONTH_TTL_MS?entry:null;}
+  async function loadScheduleMonth(month,force=false){
+    if(!state||!state.registered)return;
+    if(!force&&cachedMonth(month)){if(page==='schedule'&&scheduleMonth===month)render();return;}
+    if(!force&&monthRequests.has(month))return monthRequests.get(month);
+    if(force)monthCache.delete(month);
+    const generation=(monthGenerations.get(month)||0)+1;monthGenerations.set(month,generation);
+    scheduleError='';if(page==='schedule'&&scheduleMonth===month)render();
+    const request=api('getMyShiftsMonth',{yearMonth:month}).then(r=>{
+      if(!r||r.yearMonth!==month||!Array.isArray(r.shifts))throw Error('班表資料格式錯誤');
+      if(monthGenerations.get(month)!==generation)return; // Ignore superseded refresh responses.
+      monthCache.set(month,{at:Date.now(),shifts:r.shifts});
+      // Prevent an unbounded memory cache when browsing many years.
+      while(monthCache.size>9)monthCache.delete(monthCache.keys().next().value);
+      if(page==='schedule'&&scheduleMonth===month){scheduleError='';render();}
+    }).catch(e=>{if(monthGenerations.get(month)===generation&&page==='schedule'&&scheduleMonth===month){scheduleError=errMap[e.message]||e.message||'班表讀取失敗';render();}}).finally(()=>{if(monthRequests.get(month)===request)monthRequests.delete(month);});
+    monthRequests.set(month,request);
+    return request;
+  }
+  function shiftSummary(s){const start=dateKey(s.startAt),end=dateKey(s.endAt);return `${tTime(s.startAt)} – ${tTime(s.endAt)}${start!==end?'（隔日）':''}`;}
+  function schedule(){
+    const [year,mo]=scheduleMonth.split('-').map(Number),last=new Date(Date.UTC(year,mo,0)).getUTCDate();
+    // Monday-first calendar, always a complete number of seven-day weeks.
+    const first=(new Date(Date.UTC(year,mo-1,1)).getUTCDay()+6)%7;
+    const cells=Math.ceil((first+last)/7)*7,entry=cachedMonth(scheduleMonth),items=entry?entry.shifts:[];
+    const perDay=new Map();for(const s of items){const day=dateKey(s.startAt);if(!perDay.has(day))perDay.set(day,[]);perDay.get(day).push(s);}
+    const countedDays=perDay.size;const selectedItems=perDay.get(scheduleDay)||[];
+    const years=Array.from({length:80},(_,i)=>2020+i);
+    const selectYear=`<select id="schedule-year" aria-label="選擇年份">${years.map(y=>`<option value="${y}" ${year===y?'selected':''}>${y} 年</option>`).join('')}</select>`;
+    const selectMonth=`<select id="schedule-month" aria-label="選擇月份">${Array.from({length:12},(_,i)=>`<option value="${String(i+1).padStart(2,'0')}" ${mo===i+1?'selected':''}>${i+1} 月</option>`).join('')}</select>`;
+    const content=!entry ? `<div class="schedule-loading" role="status">${scheduleError?`<strong>無法讀取班表</strong><p>${safe(scheduleError)}</p><button class="btn outline" id="schedule-retry">重新查詢</button>`:'<div class="loader"></div><p>正在讀取 '+year+' 年 '+mo+' 月已發布班表…</p>'}</div>` :
+     `<div class="schedule-tally"><div><span>本月已發布班別</span><strong>${items.length} <small>班</small></strong></div><div><span>有排班日期</span><strong>${countedDays} <small>天</small></strong></div></div>
+      ${scheduleView==='calendar'?`<div class="schedule-month-grid" role="group" aria-label="${year} 年 ${mo} 月班表">
+        ${['一','二','三','四','五','六','日'].map(w=>`<div class="schedule-week-label">${w}</div>`).join('')}
+        ${Array.from({length:cells},(_,i)=>{const d=i-first+1;if(d<1||d>last)return '<div class="schedule-blank" aria-hidden="true"></div>';const key=scheduleMonth+'-'+String(d).padStart(2,'0'),on=perDay.get(key)||[];return `<button type="button" data-schedule-day="${key}" aria-label="${mo}月${d}日，${on.length?'已發布'+on.length+'個班別':'無已發布班別'}" aria-pressed="${scheduleDay===key}" class="schedule-date ${scheduleDay===key?'selected':''} ${key===nowKey()?'current':''} ${on.length?'has-shift':''}"><span class="schedule-date-number">${d}</span>${on.length?`<span class="schedule-date-time">${tTime(on[0].startAt)}</span>${on.length>1?`<span class="schedule-count">+${on.length-1}</span>`:'<span class="schedule-dot"></span>'}`:'<span class="schedule-date-empty">—</span>'}</button>`;}).join('')}</div>
+        <div class="schedule-selected" role="region" aria-label="選取日期班表"><div class="schedule-selected-head"><strong>${scheduleDay.slice(5).replace('-','/')} 班表</strong><span>${selectedItems.length?selectedItems.length+' 班':'未列入已發布班表'}</span></div>${selectedItems.length?selectedItems.map(s=>`<div class="schedule-shift-line"><span class="schedule-shift-icon">◷</span><div><strong>${shiftSummary(s)}</strong><small>嘎比嘎比水族工作室 · 已發布</small></div></div>`).join(''):'<p class="schedule-empty-day">目前沒有這一天的已發布班別，並不代表已核定休假。</p>'}</div>`:
+        `<div class="schedule-list">${items.length?Array.from(perDay.entries()).sort((x,y)=>x[0].localeCompare(y[0])).map(([date,arr])=>`<div class="schedule-list-group"><div class="schedule-list-day">${date.slice(5).replace('-','/')} <small>週${['日','一','二','三','四','五','六'][new Date(date+'T12:00:00+08:00').getUTCDay()]}</small></div>${arr.map(s=>`<div class="schedule-shift-line"><span class="schedule-shift-icon">◷</span><div><strong>${shiftSummary(s)}</strong><small>已發布 · 嘎比嘎比水族工作室</small></div></div>`).join('')}</div>`).join(''):'<div class="schedule-no-published"><span aria-hidden="true">▦</span><strong>本月尚無已發布班表</strong><p>可能尚未安排或尚未發布，請以管理者公告為準。</p></div>'}</div>`}
+      ${items.length===0&&scheduleView==='calendar'?'<div class="schedule-unpublished">本月尚無已發布班表，請勿將空白日期視為已核定休假。</div>':''}`;
+    return `${header('我的班表','選擇年份、月份，查看自己的已發布班別。')}
+      <section class="card schedule-panel"><div class="schedule-toolbar"><div class="schedule-nav"><button class="schedule-arrow" id="schedule-prev" type="button" aria-label="上一個月">‹</button><div class="schedule-pickers"><label>年份 ${selectYear}</label><label>月份 ${selectMonth}</label></div><button class="schedule-arrow" id="schedule-next" type="button" aria-label="下一個月">›</button></div><div class="schedule-tools"><button type="button" class="btn small outline" id="schedule-today">回到本月</button><button type="button" class="btn small outline" id="schedule-refresh">⟳ 更新</button></div></div>
+      <div class="schedule-switch" role="group" aria-label="班表顯示模式"><button type="button" class="${scheduleView==='calendar'?'active':''}" data-schedule-view="calendar" aria-pressed="${scheduleView==='calendar'}">▦ 月曆</button><button type="button" class="${scheduleView==='list'?'active':''}" data-schedule-view="list" aria-pressed="${scheduleView==='list'}">☷ 列表</button></div>${content}</section><p class="schedule-footer">時間皆為台灣時間（UTC+8）。僅顯示您本人的已發布班表，跨日班歸屬於開始日期。想查看最新異動可點「更新」。</p>`;
   }
   function attendance(){const items=myEvents().slice().reverse().slice(0,80),cs=state.corrections.filter(c=>c.employeeId===state.me.employeeId).slice().reverse();
     return `${header('出勤與補卡','每一筆正式出勤與調整紀錄，都有完整歷程。')}<div class="grid four-clock">${[['IN','GPS 上班'],['BREAK_START','GPS 休息開始'],['BREAK_END','GPS 休息結束'],['OUT','GPS 下班']].map(([kind,label])=>`<button class="btn ${kind==='IN'?'primary':'outline'}" data-clock="${kind}" ${!(currentShiftState()==='OFF'&&kind==='IN'||currentShiftState()==='WORK'&&['BREAK_START','OUT'].includes(kind)||currentShiftState()==='BREAK'&&kind==='BREAK_END')?'disabled':''}>${label}</button>`).join('')}</div><div class="notice">四種打卡均須在工作室 GPS 範圍內。外出用餐時請先在店內打休息開始，返回店內後再打休息結束。</div>
@@ -122,8 +179,17 @@
   }
   function csvDownload(entries){const headers=['EmployeeID','Name','Kind','EffectiveAtUTC','RecordedAtUTC','Source'];const dangerous=v=>{const s=String(v??'');return /^[\s]*[=+@\-\t\r]/.test(s)?"'"+s:s;};const quote=v=>'"'+dangerous(v).replace(/"/g,'""')+'"';const body=[headers,...entries.map(e=>[e.employeeId,e.name,e.kind,e.effectiveAt,e.recordedAt,e.source])].map(r=>r.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob(['\ufeff'+body],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`GuppyHR_Attendance_${nowKey()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function bind(){
+    const sy=root.querySelector('#schedule-year'),sm=root.querySelector('#schedule-month');
+    if(sy&&sm){sy.onchange=()=>setScheduleMonth(sy.value+'-'+sm.value);sm.onchange=()=>setScheduleMonth(sy.value+'-'+sm.value);}
+    const prev=root.querySelector('#schedule-prev');if(prev)prev.onclick=()=>setScheduleMonth(monthShift(scheduleMonth,-1));
+    const next=root.querySelector('#schedule-next');if(next)next.onclick=()=>setScheduleMonth(monthShift(scheduleMonth,1));
+    const today=root.querySelector('#schedule-today');if(today)today.onclick=()=>{if(scheduleMonth===nowMonth()){scheduleDay=nowKey();render();}else setScheduleMonth(nowMonth());};
+    const refresh=root.querySelector('#schedule-refresh');if(refresh)refresh.onclick=()=>loadScheduleMonth(scheduleMonth,true);
+    const retry=root.querySelector('#schedule-retry');if(retry)retry.onclick=()=>loadScheduleMonth(scheduleMonth,true);
+    root.querySelectorAll('[data-schedule-view]').forEach(el=>el.onclick=()=>{scheduleView=el.dataset.scheduleView;render();});
+    root.querySelectorAll('[data-schedule-day]').forEach(el=>el.onclick=()=>{scheduleDay=el.dataset.scheduleDay;render();});
     root.querySelectorAll('[data-clock]').forEach(el=>el.onclick=()=>clock(el.dataset.clock));
-    root.querySelectorAll('[data-pagego]').forEach(el=>el.onclick=()=>{page=el.dataset.pagego;render();});
+    root.querySelectorAll('[data-pagego]').forEach(el=>el.onclick=()=>openPage(el.dataset.pagego));
     const correction=document.querySelector('#correction');if(correction)correction.onsubmit=e=>{e.preventDefault();mutate('requestCorrection',{kind:document.querySelector('#corr-kind').value,requestedAt:localISO(document.querySelector('#corr-time').value),reason:document.querySelector('#corr-reason').value},'補卡申請已送出');};
     const employee=document.querySelector('#employee-form');if(employee)employee.onsubmit=e=>{e.preventDefault();mutate('addEmployee',{uid:document.querySelector('#emp-uid').value.trim(),name:document.querySelector('#emp-name').value.trim(),role:document.querySelector('#emp-role').value},'員工已建立');};
     const shift=document.querySelector('#shift-form');if(shift)shift.onsubmit=e=>{e.preventDefault();mutate('createShift',{employeeId:document.querySelector('#shift-emp').value,startAt:localISO(document.querySelector('#shift-start').value),endAt:localISO(document.querySelector('#shift-end').value)},'班表草稿已建立');};

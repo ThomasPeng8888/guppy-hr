@@ -58,3 +58,40 @@
 .schedule-panel button:focus-visible,.schedule-panel select:focus-visible{outline:3px solid #3ca8d5;outline-offset:2px}
 @media(max-width:560px){.schedule-toolbar{align-items:stretch;gap:10px}.schedule-nav{justify-content:space-between}.schedule-pickers{flex:1;justify-content:center;gap:8px}.schedule-pickers label{gap:4px}.schedule-pickers select{padding:8px 19px 8px 7px;font-size:13px}.schedule-tools{justify-content:flex-end}.schedule-date,.schedule-blank{min-height:68px}.schedule-date{padding:5px 1px;gap:1px;border-radius:9px}.schedule-date.selected{padding:4px 0}.schedule-date-number{font-size:12px}.schedule-date-time{font-size:9px;padding:1px 2px}.schedule-month-grid{gap:3px}.schedule-tally strong{font-size:20px}}
 @media(prefers-reduced-motion:reduce){.schedule-date,.schedule-switch button{transition:none}}
+
+
+/* Guppy HR 1.1.3 · ADMIN roster management */
+.admin-roster-callout{display:flex;justify-content:space-between;align-items:center;gap:16px;background:linear-gradient(125deg,#f1faff,#fff);border:1px solid #dbeefa;border-radius:15px;padding:18px}
+.admin-roster-callout h3{margin:7px 0;color:#173472}.admin-roster-callout p{margin:0;line-height:1.6}
+.roster-workspace{padding:clamp(14px,2.5vw,24px)}
+.roster-toolbar,.roster-toolbar-tools,.roster-month-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.roster-toolbar{justify-content:space-between}.roster-month-nav strong{font-size:19px;color:#173472;min-width:125px;text-align:center}
+.roster-toolbar-tools select{border:1px solid #dce7f1;border-radius:11px;padding:10px;color:#193c6c;background:white;font-weight:700;max-width:195px}
+.roster-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.roster-metrics>div{padding:13px 14px;background:#f1f7fc;border:1px solid #e4edf8;border-radius:14px;display:grid;gap:3px}
+.roster-metrics small{color:#69839d;font-size:12px}.roster-metrics strong{color:#173472;font-size:24px}
+.roster-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.roster-calendar-empty,.roster-calendar-cell{min-height:105px}
+.roster-calendar-cell{border:1px solid #e5edf5;background:#fff;border-radius:12px;padding:7px 5px;display:flex;flex-direction:column;gap:5px;align-items:stretch;min-width:0;text-align:left;color:#173472;cursor:pointer}
+.roster-calendar-cell:hover{background:#f1faff;border-color:#b0daee}
+.roster-calendar-cell.selected{border:2px solid #229cca;background:#eaf7fd;padding:6px 4px}
+.roster-calendar-cell.current .roster-date-number{background:#173472;color:white;border-radius:50%}
+.roster-date-number{font-size:14px;font-weight:800;width:25px;height:25px;display:grid;place-items:center}
+.roster-mini{font-size:10px;padding:3px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:750}
+.roster-mini.published{background:#d7ecff;color:#185b98}.roster-mini.draft{background:#fff0d1;color:#916b1d}
+.roster-cell-blank{font-size:11px;color:#c6d0db}.roster-calendar-cell small{font-size:10px;color:#69829b}
+.roster-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#68829b;font-size:12px;margin:15px 0 0}
+.roster-key{display:inline-block;width:10px;height:10px;border-radius:3px}.roster-key.published{background:#82bdec}.roster-key.draft{background:#e9c16d}
+.roster-day-panel{margin-top:15px}.roster-day-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.roster-day-head h3{margin:4px 0}
+.roster-shift-line{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid #eaf0f6}.roster-shift-line:last-child{border-bottom:0}
+.roster-status{border-radius:7px;padding:5px 8px;font-size:11px;font-weight:800;flex-shrink:0}.roster-status.draft{background:#fff1d4;color:#957025}.roster-status.published{background:#dff3ff;color:#186c9c}
+.roster-shift-body{flex:1;min-width:0}.roster-shift-body strong{display:block;color:#173472;font-size:14px}.roster-shift-body small{color:#7893aa;font-size:12px}
+.roster-row-actions{display:flex;gap:6px}.roster-form-columns{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:15px 0}
+.roster-publish{border-top:1px solid #e2edf7;padding-top:15px;margin-top:10px}.roster-publish p{line-height:1.7}
+.roster-month-list{margin:10px 0}.roster-list-group{padding:8px 0;border-bottom:1px solid #eef3f8}.roster-list-day{background:transparent;border:0;color:#173472;font-weight:800;padding:9px 0;text-align:left;cursor:pointer}
+.roster-workspace button:focus-visible,.roster-workspace select:focus-visible,.roster-form-columns button:focus-visible{outline:3px solid #3b9ecb;outline-offset:2px}
+@media(max-width:850px){.roster-form-columns{grid-template-columns:1fr}}
+@media(max-width:650px){.admin-roster-callout{flex-direction:column;align-items:stretch}.roster-toolbar{align-items:stretch}.roster-toolbar-tools{justify-content:space-between}.roster-toolbar-tools select{flex:1;max-width:none}.roster-month-grid{gap:3px}.roster-calendar-cell,.roster-calendar-empty{min-height:76px}.roster-calendar-cell{padding:4px 2px;gap:3px;border-radius:8px}.roster-calendar-cell.selected{padding:3px 1px}.roster-date-number{font-size:12px;width:21px;height:21px}.roster-mini{font-size:8px;padding:2px}.roster-shift-line{flex-wrap:wrap}.roster-row-actions{width:100%;justify-content:flex-end}.roster-metrics strong{font-size:20px}}
+@media(prefers-reduced-motion:reduce){.roster-calendar-cell{transition:none}}
+
+.roster-month-picker{display:flex;align-items:center;gap:8px;font-weight:800;color:#173472}.roster-month-picker span{font-size:12px;color:#6a829b}.roster-month-picker input{min-width:130px;border:1px solid #dce7f1;border-radius:11px;background:white;padding:10px;color:#173472;font:inherit;font-weight:800}

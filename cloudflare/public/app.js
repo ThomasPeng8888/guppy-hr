@@ -1,9 +1,11 @@
-/* Guppy HR Phase 1.1.2 · Monthly Schedule | LINE LIFF mobile-first interface */
+/* Guppy HR Phase 1.1.3 · Admin Roster Calendar | LINE LIFF mobile-first interface */
 (() => {
   'use strict';
   const root=document.querySelector('#app'),nav=document.querySelector('#nav'),role=document.querySelector('#role');
   let token='',state=null,page='home',busy=false,toastTimer,payroll=null,payrollMonth=nowMonth();
   let scheduleMonth=nowMonth(),scheduleView='calendar',scheduleDay='',scheduleError='';
+  let rosterMonth=nowMonth(),rosterDay='',rosterView='calendar',rosterEmployee='ALL',rosterError='',rosterEditing='';
+  const rosterCache=new Map(),rosterRequests=new Map(),rosterGenerations=new Map(),ROSTER_TTL_MS=90000;
   const monthCache=new Map(),monthRequests=new Map(),monthGenerations=new Map(),MONTH_TTL_MS=120000;
   function nowMonth(){const f=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).formatToParts(new Date());const p=Object.fromEntries(f.map(x=>[x.type,x.value]));return `${p.year}-${p.month}`;}
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,17 +13,17 @@
   const tTime=v=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(v));
   const dateKey=v=>{const f=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(v));const p=Object.fromEntries(f.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;};
   const nowKey=()=>dateKey(new Date());
-  scheduleDay=nowKey();
+  scheduleDay=nowKey();rosterDay=nowKey();
   const localISO=v=>v?new Date(v+':00+08:00').toISOString():'';
   const text=(v)=>safe(v||'—');
   const showToast=(s)=>{let n=document.querySelector('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>n.classList.remove('show'),4800);};
-  const errMap={INVALID_CLOCK_SEQUENCE:'目前打卡順序不正確，請先結束休息或完成上班。',EVENT_SEQUENCE_CONFLICT:'打卡紀錄順序異常，請由管理員覆核。',CORRECTION_SEQUENCE_CONFLICT:'補卡可能讓出勤順序出錯，請檢查時間。',PAYROLL_UNRESOLVED_EXCEPTIONS:'有未解決的出勤、薪資或法規異常，暫時不能封存。',PAYROLL_PREVIEW_CHANGED:'薪資資料已變動，請重新試算。',PAYROLL_SNAPSHOT_TOO_LARGE:'本月薪資明細超過 Google Sheets 單格容量，請聯絡管理者處理後再封存。',CLOSED_PAYROLL_COMPENSATION_HISTORY:'生效月份已封存，不可追溯變更薪資。',PAYROLL_PERIOD_CLOSED:'此月份已完成薪資封存，不可直接修改原始紀錄。',BELOW_MINIMUM_HOURLY_WAGE:'設定時薪低於生效日期的法定最低工資。',COMPENSATION_DATE_MUST_INCREASE:'新薪資生效日必須晚於上一筆設定。',SELF_APPROVAL_NOT_ALLOWED:'不可簽核自己的申請。',INVALID_SCHEDULE_MONTH:'年月格式不正確，請重新選擇。',NOT_REGISTERED:'您的 LINE 帳號尚未建立員工資料。',NO_PERMISSION:'您沒有執行此操作的權限。',WORKSITE_NOT_CALIBRATED:'管理者尚未完成工作室 GPS 校準。',LOW_GPS_ACCURACY:'目前 GPS 誤差過大，請走到開闊處重新定位。',OUTSIDE_WORKSITE:'定位顯示您不在工作室允許打卡的範圍內。',STALE_GPS:'定位資料已逾時，請重新定位。',ALREADY_CLOCKED_IN:'您目前已經上班打卡，請使用下班打卡。',NOT_CLOCKED_IN:'目前沒有尚未結束的上班打卡。',SERVER_BUSY:'目前伺服器忙碌，請稍後再試。',EXPIRED_REQUEST:'連線逾時，請重試。',BAD_SIGNATURE:'後端驗證設定有誤，請聯絡管理者。',LINE_TOKEN_INVALID:'LINE 登入已失效，請重新開啟系統。',INVALID_CALIBRATION:'GPS 誤差過高，無法完成校準。',SHIFT_OVERLAP:'員工已有時間重疊的班表。',CORRECTION_SEQUENCE_CONFLICT:'此補卡會造成上下班事件順序衝突，請檢查補卡時間及既有紀錄。',EMPLOYEE_EXISTS:'此 LINE 帳號已經有員工資料。',BAD_CORRECTION:'請完整填寫補卡類別、時間與至少 5 個字的原因。',BAD_CORRECTION_DATE:'補卡日期超出可申請範圍（過去 30 天）。'};
+  const errMap={INVALID_CLOCK_SEQUENCE:'目前打卡順序不正確，請先結束休息或完成上班。',EVENT_SEQUENCE_CONFLICT:'打卡紀錄順序異常，請由管理員覆核。',CORRECTION_SEQUENCE_CONFLICT:'補卡可能讓出勤順序出錯，請檢查時間。',PAYROLL_UNRESOLVED_EXCEPTIONS:'有未解決的出勤、薪資或法規異常，暫時不能封存。',PAYROLL_PREVIEW_CHANGED:'薪資資料已變動，請重新試算。',PAYROLL_SNAPSHOT_TOO_LARGE:'本月薪資明細超過 Google Sheets 單格容量，請聯絡管理者處理後再封存。',CLOSED_PAYROLL_COMPENSATION_HISTORY:'生效月份已封存，不可追溯變更薪資。',PAYROLL_PERIOD_CLOSED:'此月份已完成薪資封存，不可直接修改原始紀錄。',BELOW_MINIMUM_HOURLY_WAGE:'設定時薪低於生效日期的法定最低工資。',COMPENSATION_DATE_MUST_INCREASE:'新薪資生效日必須晚於上一筆設定。',SELF_APPROVAL_NOT_ALLOWED:'不可簽核自己的申請。',INVALID_SCHEDULE_MONTH:'年月格式不正確，請重新選擇。',NOT_REGISTERED:'您的 LINE 帳號尚未建立員工資料。',NO_PERMISSION:'您沒有執行此操作的權限。',WORKSITE_NOT_CALIBRATED:'管理者尚未完成工作室 GPS 校準。',LOW_GPS_ACCURACY:'目前 GPS 誤差過大，請走到開闊處重新定位。',OUTSIDE_WORKSITE:'定位顯示您不在工作室允許打卡的範圍內。',STALE_GPS:'定位資料已逾時，請重新定位。',ALREADY_CLOCKED_IN:'您目前已經上班打卡，請使用下班打卡。',NOT_CLOCKED_IN:'目前沒有尚未結束的上班打卡。',SERVER_BUSY:'目前伺服器忙碌，請稍後再試。',EXPIRED_REQUEST:'連線逾時，請重試。',BAD_SIGNATURE:'後端驗證設定有誤，請聯絡管理者。',LINE_TOKEN_INVALID:'LINE 登入已失效，請重新開啟系統。',INVALID_CALIBRATION:'GPS 誤差過高，無法完成校準。',SHIFT_OVERLAP:'員工已有時間重疊的班表。',CORRECTION_SEQUENCE_CONFLICT:'此補卡會造成上下班事件順序衝突，請檢查補卡時間及既有紀錄。',EMPLOYEE_EXISTS:'此 LINE 帳號已經有員工資料。',BAD_CORRECTION:'請完整填寫補卡類別、時間與至少 5 個字的原因。',BAD_CORRECTION_DATE:'補卡日期超出可申請範圍（過去 30 天）。',ROSTER_CHANGED_REFRESH:'班表已被其他管理者修改，請重新整理後操作。',PUBLISHED_SHIFT_LOCKED:'已發布班表開始後或已存在請假／加班關聯，無法直接編輯。',SHIFT_NOT_EDITABLE:'此班別已取消，不能編輯。',ROSTER_COPY_SAME_WEEK:'來源週與目標週不能相同。',ROSTER_COPY_EMPTY:'來源週沒有可複製的班表。',ROSTER_COPY_CONFLICT:'目標週有重疊班表；本次複製完全未寫入，請先確認。',ROSTER_COPY_TO_PAST:'不能複製班表到已過去的日期。',INVALID_ROSTER_WEEK:'週起始日期不正確。',ROSTER_WEEK_MUST_START_MONDAY:'請選擇星期一作為週起始日期。',ROSTER_COPY_TOO_MANY:'一次最多複製 150 個班別。',ROSTER_PUBLISH_PAST:'此月份包含過去的草稿，請先處理，不能整批發布。',ROSTER_INACTIVE_EMPLOYEE:'草稿包含已停用員工，請先確認，不能直接發布。'};
   async function api(action,data={}){
     const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),30000);
     try{const r=await fetch('/api/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action,data}),signal:ctrl.signal});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'NETWORK_ERROR');return j.result;}
     finally{clearTimeout(timer);}
   }
-  async function mutate(action,data,ok){if(busy)return;busy=true;try{const result=await api(action,data);showToast(ok||'操作成功');state=await api('bootstrap');monthCache.clear();render();if(page==='schedule')loadScheduleMonth(scheduleMonth,true);return result;}catch(e){showToast(errMap[e.message]||`操作失敗：${e.message}`);}finally{busy=false;}}
+  async function mutate(action,data,ok){if(busy)return;busy=true;try{const result=await api(action,data);showToast(ok||'操作成功');state=await api('bootstrap');monthCache.clear();rosterCache.clear();payroll=null;render();if(page==='schedule')loadScheduleMonth(scheduleMonth,true);if(page==='roster')loadRosterMonth(rosterMonth,true);return result;}catch(e){showToast(errMap[e.message]||`操作失敗：${e.message}`);}finally{busy=false;}}
   async function reload(){state=await api('bootstrap');render();}
   const isAdmin=()=>state&&state.registered&&state.me.role==='ADMIN';
   const myEvents=()=>((state&&state.events)||[]).filter(e=>e.employeeId===state.me.employeeId).sort((a,b)=>new Date(a.effectiveAt)-new Date(b.effectiveAt));
@@ -36,11 +38,11 @@
       document.querySelector('#refresh').onclick=()=>reload().catch(e=>showToast(e.message));return;
     }
     role.textContent=isAdmin()?'管理者':'員工';role.classList.remove('muted');nav.classList.remove('hidden');
-    if(['admin','approvals','payroll'].includes(page)&&!isAdmin())page='home';
+    if(['admin','roster','approvals','payroll'].includes(page)&&!isAdmin())page='home';
     const tabs=[['home','⌂','首頁'],['schedule','▦','班表'],['attendance','◷','出勤'],...(isAdmin()?[['approvals','☑','簽核'],['payroll','＄','薪資'],['admin','⚙','管理']]:[])];
     nav.innerHTML=tabs.map(([key,ico,label])=>`<button class="nav-item ${page===key?'active':''}" data-page="${key}"><span class="nav-icon">${ico}</span><span>${label}</span></button>`).join('');
     nav.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>openPage(x.dataset.page));
-    root.innerHTML=page==='home'?home():page==='schedule'?schedule():page==='attendance'?attendance():page==='approvals'?approvals():page==='payroll'?payrollView():admin();
+    root.innerHTML=page==='home'?home():page==='schedule'?schedule():page==='attendance'?attendance():page==='approvals'?approvals():page==='payroll'?payrollView():page==='roster'?adminRoster():admin();
     bind();
   }
   function header(title,sub){return `<div class="heading"><div><span class="overline">GUPPY HR · ${page.toUpperCase()}</span><h1>${title}</h1><p>${sub}</p></div></div>`;}
@@ -70,7 +72,7 @@
     scheduleMonth=next;scheduleDay=dayInMonth(next);scheduleError='';
     render();loadScheduleMonth(next);
   }
-  function openPage(next){page=next;render();window.scrollTo({top:0,behavior:'smooth'});if(next==='schedule')loadScheduleMonth(scheduleMonth);}
+  function openPage(next){page=next;render();window.scrollTo({top:0,behavior:'smooth'});if(next==='schedule')loadScheduleMonth(scheduleMonth);if(next==='roster')loadRosterMonth(rosterMonth);}
   function cachedMonth(month){const entry=monthCache.get(month);return entry&&Date.now()-entry.at<MONTH_TTL_MS?entry:null;}
   async function loadScheduleMonth(month,force=false){
     if(!state||!state.registered)return;
@@ -118,13 +120,75 @@
     <div class="section-title"><h2>近期出勤</h2><span class="subtitle">最近 32 天</span></div><section class="card">${items.length?items.map(e=>asItem(eventLabels[e.kind]||e.kind,`${tDate(e.effectiveAt)} · ${e.source==='GPS_LIFF'?'GPS':'補卡核准'}`,`<strong>${tTime(e.effectiveAt)}</strong>`)).join(''):'<p class="subtle">尚無出勤紀錄。</p>'}</section>
     <div class="section-title"><h2>忘記打卡申請</h2></div><section class="card stack"><div class="notice">若遇到 GPS 定位失敗，請先重新定位；確實無法打卡時才提出補卡申請。</div><form id="correction" class="stack"><div class="form-grid"><div class="field"><label for="corr-kind">補卡種類</label><select id="corr-kind"><option value="IN">上班</option><option value="OUT">下班</option><option value="BREAK_START">休息開始</option><option value="BREAK_END">休息結束</option></select></div><div class="field"><label for="corr-time">實際出勤時間（台灣時間）</label><input required id="corr-time" type="datetime-local"></div></div><div class="field"><label for="corr-reason">補卡原因</label><textarea required minlength="5" maxlength="300" id="corr-reason" placeholder="請描述為何無法正常打卡"></textarea></div><button class="btn primary" type="submit">送出補卡申請</button></form>${cs.length?'<h3>我的申請紀錄</h3>'+cs.map(c=>asItem(`${eventLabels[c.kind]||c.kind} · ${tDate(c.requestedAt)} ${tTime(c.requestedAt)}`,text(c.reason),`<span class="tag">${({PENDING:'待審核',APPROVED:'已核准',REJECTED:'已退回'})[c.status]||c.status}</span>`)).join(''):''}</section>${requestForms()}`;
   }
+  // 1.1.3 Full ADMIN roster is a separate workspace: employee-facing month API
+  // remains strictly self-only; ADMIN query carries every active shift for a month.
+  function rosterCached(month){const v=rosterCache.get(month);return v&&Date.now()-v.at<ROSTER_TTL_MS?v:null;}
+  async function loadRosterMonth(month,force=false){
+    if(!isAdmin())return;
+    if(!force&&rosterCached(month)){if(page==='roster'&&rosterMonth===month)render();return;}
+    if(!force&&rosterRequests.has(month))return rosterRequests.get(month);
+    if(force)rosterCache.delete(month);
+    const gen=(rosterGenerations.get(month)||0)+1;rosterGenerations.set(month,gen);
+    rosterError='';if(page==='roster'&&rosterMonth===month)render();
+    const request=api('getAdminRosterMonth',{yearMonth:month}).then(v=>{
+      if(!v||v.yearMonth!==month||!Array.isArray(v.shifts))throw Error('全員班表資料格式錯誤');
+      if(rosterGenerations.get(month)!==gen)return;
+      rosterCache.set(month,{at:Date.now(),shifts:v.shifts});while(rosterCache.size>6)rosterCache.delete(rosterCache.keys().next().value);
+      if(page==='roster'&&rosterMonth===month){rosterError='';render();}
+    }).catch(e=>{if(rosterGenerations.get(month)===gen&&page==='roster'&&rosterMonth===month){rosterError=errMap[e.message]||e.message||'班表查詢失敗';render();}})
+    .finally(()=>{if(rosterRequests.get(month)===request)rosterRequests.delete(month);});
+    rosterRequests.set(month,request);return request;
+  }
+  function setRosterMonth(month){
+    if(!monthValid(month)||month<'2020-01'||month>'2099-12')return showToast('請選擇 2020 至 2099 年。');
+    if(month===rosterMonth)return;
+    rosterMonth=month;rosterDay=dayInMonth(month);rosterEditing='';rosterError='';render();loadRosterMonth(month);
+  }
+  function rosterStartMonday(day){
+    const d=new Date(day+'T12:00:00+08:00'),wd=(d.getUTCDay()+6)%7;
+    const monday=new Date(Date.parse(day+'T00:00:00+08:00')-wd*86400000);
+    return dateKey(monday);
+  }
+  function localInput(t){return t?dateKey(t)+'T'+tTime(t):'';}
+  function addDaysKey(key,n){return dateKey(new Date(Date.parse(key+'T12:00:00+08:00')+n*86400000));}
+  function adminRoster(){
+    const entry=rosterCached(rosterMonth),all=entry?entry.shifts:[],staff=(state.employees||[]),selected=rosterEmployee;
+    const visible=selected==='ALL'?all:all.filter(r=>r.employeeId===selected);
+    const staffName=id=>(staff.find(e=>e.employeeId===id)||{}).name||id;
+    const byDay=new Map();for(const s of visible){const k=dateKey(s.startAt);if(!byDay.has(k))byDay.set(k,[]);byDay.get(k).push(s);}
+    const [year,mm]=rosterMonth.split('-').map(Number),last=new Date(Date.UTC(year,mm,0)).getUTCDate();
+    const start=(new Date(Date.UTC(year,mm-1,1)).getUTCDay()+6)%7,total=Math.ceil((start+last)/7)*7;
+    const counts={draft:visible.filter(x=>x.status==='DRAFT').length,published:visible.filter(x=>x.status==='PUBLISHED').length};
+    const dayShifts=byDay.get(rosterDay)||[],editing=all.find(x=>x.id===rosterEditing);
+    const empOpt=staff.filter(x=>x.enabled||all.some(s=>s.employeeId===x.employeeId)).map(x=>`<option value="${safe(x.employeeId)}" ${editing?editing.employeeId===x.employeeId?'selected':'':selected===x.employeeId?'selected':''}>${safe(x.name)}${x.enabled?'':'（停用）'}</option>`).join('');
+    const days=Array.from({length:total},(_,i)=>i-start+1);
+    const rosterItem=s=>`<div class="roster-shift-line"><span class="roster-status ${s.status==='DRAFT'?'draft':'published'}">${s.status==='DRAFT'?'草稿':'已發布'}</span><div class="roster-shift-body"><strong>${safe(staffName(s.employeeId))}</strong><small>${shiftSummary(s)}</small></div><div class="roster-row-actions"><button type="button" class="btn small outline" data-roster-edit="${safe(s.id)}">編輯</button><button type="button" class="btn small danger" data-roster-cancel="${safe(s.id)}">取消</button></div></div>`;
+    const cell=d=>{if(d<1||d>last)return '<div class="roster-calendar-empty" aria-hidden="true"></div>';
+      const key=rosterMonth+'-'+String(d).padStart(2,'0'),items=byDay.get(key)||[];
+      const labels=items.slice(0,2).map(sh=>`<span class="roster-mini ${sh.status==='DRAFT'?'draft':'published'}" title="${safe(staffName(sh.employeeId)+' '+shiftSummary(sh))}">${safe(staffName(sh.employeeId))} ${tTime(sh.startAt)}</span>`).join('');
+      return `<button type="button" class="roster-calendar-cell ${key===rosterDay?'selected':''} ${key===nowKey()?'current':''}" data-roster-day="${key}" aria-label="${key}，${items.length} 個班別"><span class="roster-date-number">${d}</span>${labels}${items.length>2?`<small>+${items.length-2} 班</small>`:items.length?'':'<span class="roster-cell-blank">—</span>'}</button>`;};
+    const currentMonday=rosterStartMonday(nowKey()),nextMonday=addDaysKey(currentMonday,7);
+    let startInput=rosterDay+'T16:00',endInput=rosterDay+'T20:00';
+    if(editing){startInput=localInput(editing.startAt);endInput=localInput(editing.endAt);}
+    return `${header('全員排班管理','月曆掌握全員班表，先建草稿、確認後再發布。')}
+    <section class="card roster-workspace">
+      <div class="roster-toolbar"><div class="roster-month-nav"><button class="schedule-arrow" id="roster-prev" aria-label="上一個月">‹</button><label class="roster-month-picker"><span>年月</span><input type="month" id="roster-month-input" min="2020-01" max="2099-12" value="${safe(rosterMonth)}" aria-label="選擇排班年月"></label><button class="schedule-arrow" id="roster-next" aria-label="下一個月">›</button></div><div class="roster-toolbar-tools"><select id="roster-emp-filter" aria-label="篩選員工"><option value="ALL">所有員工</option>${staff.map(x=>`<option value="${safe(x.employeeId)}" ${selected===x.employeeId?'selected':''}>${safe(x.name)}${x.enabled?'':'（停用）'}</option>`).join('')}</select><button id="roster-this-month" class="btn small outline">本月</button><button id="roster-reload" class="btn small outline">↻ 更新</button></div></div>
+      <div class="roster-metrics"><div><small>已發布班別</small><strong>${counts.published}</strong></div><div><small>草稿待發布</small><strong>${counts.draft}</strong></div><div><small>有排班天數</small><strong>${byDay.size}</strong></div></div>
+      <div class="schedule-switch" role="group" aria-label="排班檢視模式"><button data-roster-view="calendar" class="${rosterView==='calendar'?'active':''}">▦ 月曆</button><button data-roster-view="list" class="${rosterView==='list'?'active':''}">☷ 列表</button></div>
+      ${!entry?rosterError?`<div class="schedule-loading"><strong>查詢失敗</strong><p>${safe(rosterError)}</p><button class="btn outline" id="roster-retry">重新查詢</button></div>`:'<div class="schedule-loading"><div class="loader"></div><p>正在載入全員班表…</p></div>':rosterView==='calendar'?`<div class="roster-month-grid">${['一','二','三','四','五','六','日'].map(d=>`<span class="schedule-week-label">${d}</span>`).join('')}${days.map(cell).join('')}</div>`:visible.length?`<div class="roster-month-list">${[...byDay.keys()].sort().map(day=>`<div class="roster-list-group"><button type="button" class="roster-list-day" data-roster-day="${day}">${day} · ${byDay.get(day).length} 班</button>${byDay.get(day).map(rosterItem).join('')}</div>`).join('')}</div>`:'<div class="schedule-no-published"><strong>目前沒有班表</strong><p>請在下方新增草稿並發布。</p></div>'}
+      ${entry?'<p class="roster-legend"><span class="roster-key published"></span>已發布 <span class="roster-key draft"></span>草稿　·　沒有班別不代表休假</p>':''}
+    </section>
+    <section class="card stack roster-day-panel"><div class="roster-day-head"><div><span class="overline">SELECTED DAY</span><h3>${safe(rosterDay)} 班表</h3></div><span class="tag">${dayShifts.length} 班</span></div>${entry?(dayShifts.map(rosterItem).join('')||'<p class="subtle">當日尚無班別。可在下方立即新增。</p>'):'<p class="subtle">載入班表後可查看或編輯。</p>'}</section>
+    <div class="roster-form-columns"><section class="card stack"><div class="roster-day-head"><h3>${editing?'編輯現有班別':'快速新增班表草稿'}</h3>${editing?'<button class="btn small outline" id="roster-edit-clear">取消編輯</button>':''}</div><p class="help">${editing?'已發布的未來班別可安全調整時間，變更會通知員工；已有關聯申請的班別不可直接修改。':'點選月曆日期，自動帶入日期；可用班別範本快速填入時間。'}</p><form class="stack" id="roster-shift-form"><div class="field"><label>員工</label><select id="roster-form-employee" required ${editing?'disabled':''}>${empOpt}</select></div><div class="field"><label>班別範本</label><select id="roster-template"><option value="">自訂時間</option>${(state.templates||[]).map(t=>`<option value="${safe(t.id)}">${safe(t.name)} ${safe(t.start)}–${safe(t.end)}</option>`).join('')}</select></div><div class="form-grid"><div class="field"><label>開始（台灣時間）</label><input type="datetime-local" required id="roster-form-start" value="${safe(startInput)}"></div><div class="field"><label>結束（台灣時間）</label><input type="datetime-local" required id="roster-form-end" value="${safe(endInput)}"></div></div><button type="submit" class="btn primary full">${editing?'確認修改班別':'建立草稿班別'}</button></form></section>
+    <section class="card stack"><h3>複製整週班表</h3><p class="help">選擇來源週與目標週的星期一，複製後一律成為草稿，不自動發布。若目標有重疊，不會部分寫入。</p><form id="roster-copy-form" class="stack"><div class="field"><label>複製員工範圍</label><select id="roster-copy-employee"><option value="">全部員工</option>${staff.filter(x=>x.enabled).map(e=>`<option value="${safe(e.employeeId)}" ${selected===e.employeeId?'selected':''}>${safe(e.name)}</option>`).join('')}</select></div><div class="form-grid"><div class="field"><label>來源週（一）</label><input id="roster-copy-from" type="date" value="${currentMonday}" required></div><div class="field"><label>目標週（一）</label><input id="roster-copy-to" type="date" value="${nextMonday}" required></div></div><button type="submit" class="btn outline full">複製為新草稿</button></form><div class="roster-publish"><h3>發布本月草稿</h3><p class="help">只發布目前選定月份${selected==='ALL'?'的所有員工':'與所選員工'}的草稿。過去的草稿或已月結月份不允許發布。</p><button id="roster-publish" class="btn primary full" ${!entry||counts.draft===0?'disabled':''}>發布 ${counts.draft} 筆草稿</button></div></section></div>
+    <div class="actions"><button type="button" class="btn outline" data-pagego="admin">← 返回管理工作台</button><button type="button" class="btn outline" data-pagego="schedule">查看我的班表</button></div>`;
+  }
   function admin(){const site=state.worksite,staff=state.employees||[],pending=state.corrections.filter(c=>c.status==='PENDING'),all=state.shifts.slice().sort((a,b)=>new Date(a.startAt)-new Date(b.startAt)),name=id=>(staff.find(x=>x.employeeId===id)||{}).name||id;
     return `${header('管理工作台','員工 · 排班 · 補卡審核 · 據點管理')}
       <div class="grid three"><div class="card stat"><div><span>啟用員工</span><br><strong>${staff.filter(x=>x.enabled).length}</strong></div></div><div class="card stat"><div><span>待審補卡</span><br><strong>${pending.length}</strong></div></div><div class="card stat"><div><span>近期班表</span><br><strong>${all.length}</strong></div></div></div>
       <div class="section-title"><h2>GPS 工作據點</h2></div><section class="card stack"><div><strong>${safe(site.name)}</strong><p class="subtle">${safe(site.address)}</p><span class="pill ${site.latitude===null?'warn':'good'}">${site.latitude===null?'尚未校準 GPS':'已完成 GPS 校準'}</span></div>${site.latitude!==null?`<p class="mono">座標 ${site.latitude.toFixed(6)}, ${site.longitude.toFixed(6)}</p>`:''}<div class="notice">請管理者親自在工作室中心點操作。定位誤差須 ≤ 60 公尺。第一次校準後，員工才能打卡。</div><div class="form-grid"><div class="field"><label>允許打卡半徑（公尺）</label><input type="number" id="site-radius" min="50" max="300" value="${site.radius}"></div><div class="field"><label>最大定位誤差（公尺）</label><input type="number" id="site-accuracy" min="20" max="150" value="${site.maxAccuracy}"></div></div><button class="btn primary" id="calibrate">📍 用我現在的位置校準工作室</button></section>
       <div class="section-title"><h2>新增員工</h2></div><section class="card"><form id="employee-form" class="stack"><div class="form-grid"><div class="field"><label>員工姓名</label><input required id="emp-name" maxlength="80" placeholder="員工名稱"></div><div class="field"><label>身分權限</label><select id="emp-role"><option value="STAFF">一般員工</option><option value="ADMIN">管理者</option></select></div></div><div class="field"><label>LINE User ID（員工首次登入畫面可複製）</label><input required id="emp-uid" pattern="U[0-9a-fA-F]{32}" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div><button class="btn primary" type="submit">新增員工</button></form></section>
-      <div class="section-title"><h2>建立班表</h2></div><section class="card"><form id="shift-form" class="stack"><div class="field"><label>員工</label><select id="shift-emp">${staff.filter(x=>x.enabled).map(x=>`<option value="${safe(x.employeeId)}">${safe(x.name)}</option>`).join('')}</select></div><div class="form-grid"><div class="field"><label>開始（台灣時間）</label><input required id="shift-start" type="datetime-local"></div><div class="field"><label>結束（台灣時間）</label><input required id="shift-end" type="datetime-local"></div></div><button class="btn primary" type="submit">新增班表草稿</button></form><p class="help">可建立跨日班；同一員工班表不得重疊。草稿發布後才正式通知。</p><button class="btn outline full" id="publish">發布未來 35 天的所有班表草稿</button></section>
-      <div class="section-title"><h2>近期全員班表</h2></div><section class="card">${all.length?all.map(s=>asItem(`${safe(name(s.employeeId))} · ${tDate(s.startAt)}`,`${tTime(s.startAt)} – ${tTime(s.endAt)} · ${s.status}`,`<button class="btn small danger" data-cancel="${safe(s.id)}">取消</button>`)).join(''):'<p class="subtle">尚無排班資料。</p>'}</section>
+      <div class="section-title"><h2>全員排班</h2></div><section class="card stack"><div class="admin-roster-callout"><div><span class="overline">NEW · 1.1.3</span><h3>管理者排班月曆</h3><p class="subtle">用年月月曆管理全員班表，建立／調整草稿、複製整週與選擇月份發布。</p></div><button class="btn primary" data-pagego="roster">開啟排班管理 →</button></div></section>
       <div class="section-title"><h2>待審補卡</h2></div><section class="card">${pending.length?pending.map(c=>`<div class="list-item"><div><div class="title">${safe(name(c.employeeId))} · ${c.kind==='IN'?'上班':'下班'} · ${tDate(c.requestedAt)} ${tTime(c.requestedAt)}</div><small>${safe(c.reason)}</small></div><div class="actions"><button class="btn small primary" data-review="${safe(c.id)}" data-approve="true">核准</button><button class="btn small outline" data-review="${safe(c.id)}" data-approve="false">退回</button></div></div>`).join(''):'<p class="subtle">目前沒有待審核的補卡申請。</p>'}</section>
       <div class="section-title"><h2>匯出出勤紀錄</h2></div><section class="card stack"><div class="form-grid"><div class="field"><label>開始日期</label><input id="export-from" type="date" value="${nowKey().slice(0,7)}-01"></div><div class="field"><label>結束日期</label><input id="export-to" type="date" value="${nowKey()}"></div></div><button class="btn outline" id="export">下載出勤 CSV（Excel 可開啟）</button><p class="help">匯出員工、上/下班、時間及來源。尚未包含薪資與加班核算。</p></section>`;
   }
@@ -178,7 +242,54 @@
     }catch(e){showToast(e.message);}
   }
   function csvDownload(entries){const headers=['EmployeeID','Name','Kind','EffectiveAtUTC','RecordedAtUTC','Source'];const dangerous=v=>{const s=String(v??'');return /^[\s]*[=+@\-\t\r]/.test(s)?"'"+s:s;};const quote=v=>'"'+dangerous(v).replace(/"/g,'""')+'"';const body=[headers,...entries.map(e=>[e.employeeId,e.name,e.kind,e.effectiveAt,e.recordedAt,e.source])].map(r=>r.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob(['\ufeff'+body],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`GuppyHR_Attendance_${nowKey()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  function bindRosterActions(){
+    if(page!=='roster')return;
+    const on=(id,event,fn)=>{const el=root.querySelector('#'+id);if(el)el.addEventListener(event,fn);};
+    on('roster-month-input','change',e=>setRosterMonth(e.target.value));
+    on('roster-prev','click',()=>setRosterMonth(monthShift(rosterMonth,-1)));
+    on('roster-next','click',()=>setRosterMonth(monthShift(rosterMonth,1)));
+    on('roster-this-month','click',()=>setRosterMonth(nowMonth()));
+    on('roster-reload','click',()=>loadRosterMonth(rosterMonth,true));
+    on('roster-retry','click',()=>loadRosterMonth(rosterMonth,true));
+    on('roster-emp-filter','change',e=>{rosterEmployee=e.target.value;rosterEditing='';render();});
+    root.querySelectorAll('[data-roster-view]').forEach(el=>el.onclick=()=>{rosterView=el.dataset.rosterView;render();});
+    root.querySelectorAll('[data-roster-day]').forEach(el=>el.onclick=()=>{rosterDay=el.dataset.rosterDay;rosterEditing='';render();});
+    root.querySelectorAll('[data-roster-edit]').forEach(el=>el.onclick=()=>{rosterEditing=el.dataset.rosterEdit;rosterDay=dateKey((rosterCached(rosterMonth)||{shifts:[]}).shifts.find(s=>s.id===rosterEditing).startAt);render();document.getElementById('roster-shift-form')?.scrollIntoView({behavior:'smooth',block:'center'});});
+    root.querySelectorAll('[data-roster-cancel]').forEach(el=>el.onclick=async()=>{
+      const item=(rosterCached(rosterMonth)||{shifts:[]}).shifts.find(s=>s.id===el.dataset.rosterCancel);
+      if(!item)return;
+      if(!confirm(`確定取消 ${dateKey(item.startAt)} ${tTime(item.startAt)} 的班別？已發布的班表取消後不會顯示在員工月曆。`))return;
+      await mutate('cancelShift',{id:item.id},'班表已取消');
+    });
+    on('roster-edit-clear','click',()=>{rosterEditing='';render();});
+    on('roster-template','change',e=>{
+      const template=(state.templates||[]).find(t=>t.id===e.target.value);if(!template)return;
+      const startEl=root.querySelector('#roster-form-start'),endEl=root.querySelector('#roster-form-end');
+      const base=(startEl.value||rosterDay+'T16:00').slice(0,10);startEl.value=base+'T'+template.start;
+      endEl.value=addDaysKey(base,template.end<=template.start?1:0)+'T'+template.end;
+    });
+    on('roster-shift-form','submit',async e=>{
+      e.preventDefault();const start=root.querySelector('#roster-form-start').value,end=root.querySelector('#roster-form-end').value;
+      if(!start||!end||Date.parse(start+':00+08:00')>=Date.parse(end+':00+08:00'))return showToast('結束時間必須晚於開始時間。');
+      const entry=rosterCached(rosterMonth),editing=entry&&entry.shifts.find(s=>s.id===rosterEditing);
+      if(editing){if(!confirm('確定更新此班別時間？已發布班別可能通知員工。'))return;
+        await mutate('updateRosterShift',{id:editing.id,startAt:localISO(start),endAt:localISO(end),expectedStartAt:editing.startAt,expectedEndAt:editing.endAt,expectedStatus:editing.status},'班別時間已更新');
+        rosterEditing='';
+      }else{await mutate('createShift',{employeeId:root.querySelector('#roster-form-employee').value,startAt:localISO(start),endAt:localISO(end)},'班表草稿已建立');}
+    });
+    on('roster-copy-form','submit',e=>{e.preventDefault();const sourceMonday=root.querySelector('#roster-copy-from').value,targetMonday=root.querySelector('#roster-copy-to').value,employeeId=root.querySelector('#roster-copy-employee').value;
+      if(!confirm(`確認複製 ${sourceMonday} 當週到 ${targetMonday} 當週？複製後全部為草稿，未發布不會顯示於員工班表。`))return;
+      mutate('copyRosterWeek',{sourceMonday,targetMonday,employeeId},'整週班表已複製成草稿');
+    });
+    on('roster-publish','click',()=>{const entry=rosterCached(rosterMonth);if(!entry)return;
+      const items=entry.shifts.filter(s=>s.status==='DRAFT'&&(rosterEmployee==='ALL'||s.employeeId===rosterEmployee));
+      if(!items.length)return showToast('沒有需要發布的草稿。');
+      if(!confirm(`將正式發布 ${rosterMonth} 的 ${items.length} 筆草稿給${rosterEmployee==='ALL'?'所有員工':'指定員工'}？發布後員工可立即查詢。`))return;
+      mutate('publishRosterMonth',{yearMonth:rosterMonth,employeeId:rosterEmployee==='ALL'?'':rosterEmployee},'本月班表已發布');
+    });
+  }
   function bind(){
+    bindRosterActions();
     const sy=root.querySelector('#schedule-year'),sm=root.querySelector('#schedule-month');
     if(sy&&sm){sy.onchange=()=>setScheduleMonth(sy.value+'-'+sm.value);sm.onchange=()=>setScheduleMonth(sy.value+'-'+sm.value);}
     const prev=root.querySelector('#schedule-prev');if(prev)prev.onclick=()=>setScheduleMonth(monthShift(scheduleMonth,-1));

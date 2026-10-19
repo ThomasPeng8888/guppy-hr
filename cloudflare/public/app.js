@@ -1,4 +1,4 @@
-/* Guppy HR 1.1.4 | Employee-facing UX polish; original workflows unchanged */
+/* Guppy HR 1.1.5 | LINE Messaging API delivery overview + 1.1.4 clean UI */
 (() => {
   'use strict';
   const root=document.querySelector('#app'),nav=document.querySelector('#nav'),role=document.querySelector('#role');
@@ -189,6 +189,7 @@
       <div class="section-title"><h2>GPS 工作據點</h2></div><section class="card stack"><div><strong>${safe(site.name)}</strong><p class="subtle">${safe(site.address)}</p><span class="pill ${site.latitude===null?'warn':'good'}">${site.latitude===null?'尚未校準 GPS':'已完成 GPS 校準'}</span></div>${site.latitude===null?'<div class="notice warn">請在工作室現場完成定位設定，才可開始打卡。</div>':''}<div class="form-grid"><div class="field"><label>允許打卡半徑（公尺）</label><input type="number" id="site-radius" min="50" max="300" value="${site.radius}"></div><div class="field"><label>最大定位誤差（公尺）</label><input type="number" id="site-accuracy" min="20" max="150" value="${site.maxAccuracy}"></div></div><button class="btn primary" id="calibrate">📍 用我現在的位置校準工作室</button></section>
       <div class="section-title"><h2>新增員工</h2></div><section class="card"><form id="employee-form" class="stack"><div class="form-grid"><div class="field"><label>員工姓名</label><input required id="emp-name" maxlength="80" placeholder="員工名稱"></div><div class="field"><label>身分權限</label><select id="emp-role"><option value="STAFF">一般員工</option><option value="ADMIN">管理者</option></select></div></div><div class="field"><label>LINE 帳號代碼</label><input required id="emp-uid" pattern="U[0-9a-fA-F]{32}" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div><button class="btn primary" type="submit">新增員工</button></form></section>
       <div class="section-title"><h2>全員排班</h2></div><section class="card stack"><div class="admin-roster-callout"><div><h3>排班月曆</h3></div><button class="btn primary" data-pagego="roster">開啟排班管理 →</button></div></section>
+      <div class="section-title"><h2>LINE 通知</h2></div><details class="card request-disclosure"><summary>通知紀錄</summary><div class="request-content stack"><p class="subtle">可以查看 LINE 是否已受理訊息；實際收到仍以員工手機為準。</p><button class="btn small outline" id="line-notification-refresh" type="button">查看最新通知</button><div id="line-notification-summary" aria-live="polite"></div></div></details>
       <div class="section-title"><h2>待審補卡</h2></div><section class="card">${pending.length?pending.map(c=>`<div class="list-item"><div><div class="title">${safe(name(c.employeeId))} · ${c.kind==='IN'?'上班':'下班'} · ${tDate(c.requestedAt)} ${tTime(c.requestedAt)}</div><small>${safe(c.reason)}</small></div><div class="actions"><button class="btn small primary" data-review="${safe(c.id)}" data-approve="true">核准</button><button class="btn small outline" data-review="${safe(c.id)}" data-approve="false">退回</button></div></div>`).join(''):'<p class="subtle">目前沒有待審核的補卡申請。</p>'}</section>
       <div class="section-title"><h2>匯出出勤紀錄</h2></div><section class="card stack"><div class="form-grid"><div class="field"><label>開始日期</label><input id="export-from" type="date" value="${nowKey().slice(0,7)}-01"></div><div class="field"><label>結束日期</label><input id="export-to" type="date" value="${nowKey()}"></div></div><button class="btn outline" id="export">下載出勤 CSV（Excel 可開啟）</button></section>`;
   }
@@ -341,6 +342,15 @@
     const correction=document.querySelector('#correction');if(correction)correction.onsubmit=e=>{e.preventDefault();mutate('requestCorrection',{kind:document.querySelector('#corr-kind').value,requestedAt:localISO(document.querySelector('#corr-time').value),reason:document.querySelector('#corr-reason').value},'補卡申請已送出');};
     const employee=document.querySelector('#employee-form');if(employee)employee.onsubmit=e=>{e.preventDefault();mutate('addEmployee',{uid:document.querySelector('#emp-uid').value.trim(),name:document.querySelector('#emp-name').value.trim(),role:document.querySelector('#emp-role').value},'員工已建立');};
     const shift=document.querySelector('#shift-form');if(shift)shift.onsubmit=e=>{e.preventDefault();mutate('createShift',{employeeId:document.querySelector('#shift-emp').value,startAt:localISO(document.querySelector('#shift-start').value),endAt:localISO(document.querySelector('#shift-end').value)},'班表草稿已建立');};
+    const lineStatus=root.querySelector('#line-notification-refresh');if(lineStatus)lineStatus.onclick=async()=>{
+      const panel=root.querySelector('#line-notification-summary');if(!panel)return;
+      panel.textContent='正在讀取通知狀態…';
+      try{
+        const data=await api('getNotificationOverview',{}),c=data.counts||{};
+        const labels={ROSTER_PUBLISHED:'班表發布',SHIFT_CHANGED:'班表調整',SHIFT_CANCELLED:'班表取消',CLOCK:'GPS 打卡',PAYROLL_CLOSED:'薪資月結'};
+        panel.innerHTML=`<div class="line-note-stats"><div><small>LINE 已受理</small><strong>${Number(c.ACCEPTED||0)}</strong></div><div><small>等待處理</small><strong>${Number(c.PENDING||0)+Number(c.RETRY||0)+Number(c.SENDING||0)}</strong></div><div><small>失敗</small><strong>${Number(c.FAILED||0)}</strong></div></div>${!data.enabled?'<p class="subtle">目前未啟用 LINE 通知，請由管理者完成設定。</p>':''}<div class="stack">${(data.latest||[]).slice(0,8).map(r=>`<div class="line-note-item"><span>${safe(labels[r.kind]||'通知')} · ${tDate(r.at)} ${tTime(r.at)}</span><span class="pill ${r.status==='ACCEPTED'?'good':r.status==='FAILED'?'warn':''}">${r.status==='ACCEPTED'?'已受理':r.status==='FAILED'?'傳送失敗':'處理中'}</span></div>`).join('')}</div>`;
+      }catch(e){panel.textContent=errMap[e.message]||'通知紀錄暫時無法讀取，請稍後再試。';}
+    };
     const cal=document.querySelector('#calibrate');if(cal)cal.onclick=calibrate;
     const publish=document.querySelector('#publish');if(publish)publish.onclick=()=>confirm('確定發布未來 35 天的所有班表草稿嗎？')&&mutate('publishShifts',{},'班表已發布');
     root.querySelectorAll('[data-cancel]').forEach(el=>el.onclick=()=>confirm('確定取消此班別嗎？')&&mutate('cancelShift',{id:el.dataset.cancel},'班別已取消'));

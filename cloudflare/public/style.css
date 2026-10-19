@@ -113,3 +113,11 @@
 .request-disclosure>summary:focus-visible{outline:3px solid #3ba4d1;outline-offset:-4px}
 .request-content{padding:1px 20px 20px}
 @media(prefers-reduced-motion:reduce){.request-disclosure>summary:after{transition:none}}
+
+/* Guppy HR 1.1.5 · Compact LINE delivery status, ADMIN-only and collapsed. */
+.line-note-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
+.line-note-stats>div{border:1px solid #dceaf2;border-radius:13px;padding:11px;background:#f5fbff;display:flex;flex-direction:column;gap:5px}
+.line-note-stats small{color:#627d9b;font-size:11px}.line-note-stats strong{color:#173472;font-size:21px}
+.line-note-item{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid #e7eef5;font-size:13px}
+.line-note-item span:first-child{flex:1}
+@media(max-width:420px){.line-note-stats>div{padding:8px}.line-note-stats strong{font-size:19px}}

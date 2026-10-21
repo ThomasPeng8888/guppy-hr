@@ -121,3 +121,11 @@
 .line-note-item{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid #e7eef5;font-size:13px}
 .line-note-item span:first-child{flex:1}
 @media(max-width:420px){.line-note-stats>div{padding:8px}.line-note-stats strong{font-size:19px}}
+
+/* 1.1.7.0 Expense claim and reimbursement summary */
+.expense-payroll-summary{display:flex;gap:12px;flex-wrap:wrap;padding:13px 16px;background:#f0f8fe;border-radius:12px;color:#234772;font-size:13px}
+.expense-payroll-summary strong{font-size:15px;color:#173472}
+@media(max-width:540px){.bottom-nav .nav-item{font-size:10px;padding:9px 2px}.bottom-nav .nav-icon{font-size:17px}}
+
+/* 1.1.7.1 · ADMIN monthly one-off payroll additions */
+.payroll-extra-panel{border:1px solid #dbe8f6;background:#f8fbff;border-radius:15px;padding:17px;display:grid;gap:12px}.payroll-extra-panel h3{margin:0;color:#173472}.payroll-extra-panel .list-item .title{overflow-wrap:anywhere}.payroll-extra-panel .list-item small{display:block;margin-top:3px}@media(max-width:650px){.payroll-extra-panel{padding:13px}.payroll-extra-panel .list-item button{width:100%}}

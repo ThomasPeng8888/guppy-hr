@@ -1,4 +1,4 @@
-/* Guppy HR 1.1.7.8 Integrated | Overnight scheduled and temporary work + Employee expenses + ADMIN payroll additions + finalized LINE payslips */
+/* Guppy HR 1.1.7.9 Integrated | Overnight scheduled and temporary work + Employee expenses + ADMIN payroll additions + finalized LINE payslips */
 (() => {
   'use strict';
   const root=document.querySelector('#app'),nav=document.querySelector('#nav'),role=document.querySelector('#role');
@@ -473,7 +473,8 @@
     await liff.init({liffId:cfg.liffId});if(!liff.isLoggedIn()){liff.login({redirectUri:window.location.href});return;}
     // LIFF restores permanent-link query parameters only after liff.init().
     // The URL is only a navigation hint, never an authorization source.
-    if(new URLSearchParams(window.location.search).get('view')==='my-payroll')page='my-payroll';
+    const requestedView=new URLSearchParams(window.location.search).get('view');
+    if(['my-payroll','approvals'].includes(requestedView))page=requestedView;
     token=liff.getIDToken();if(!token)throw Error('LINE 未提供 ID Token，請確認 LIFF 已啟用 openid Scope。');
     await reload();
   }catch(e){root.innerHTML=`<div class="empty"><h2>暫時無法連線</h2><p>${safe(errMap[e.message]||'連線暫時異常，請稍後再試。')}</p><button class="btn outline" onclick="location.reload()">重新整理</button></div>`;role.textContent='連線失敗';}}

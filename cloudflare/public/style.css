@@ -129,3 +129,8 @@
 
 /* 1.1.7.1 · ADMIN monthly one-off payroll additions */
 .payroll-extra-panel{border:1px solid #dbe8f6;background:#f8fbff;border-radius:15px;padding:17px;display:grid;gap:12px}.payroll-extra-panel h3{margin:0;color:#173472}.payroll-extra-panel .list-item .title{overflow-wrap:anywhere}.payroll-extra-panel .list-item small{display:block;margin-top:3px}@media(max-width:650px){.payroll-extra-panel{padding:13px}.payroll-extra-panel .list-item button{width:100%}}
+
+/* Phase 1.1.7.8 integrated: payroll-only additions */
+.payroll-total-hours{font-weight:800;color:#17618d;background:#f0f9ff}
+.payroll-privacy-note{font-size:13px;color:#607d9a;margin:0 0 14px}
+@media(max-width:650px){.bottom-nav .nav-item{min-width:0}.payroll-total-hours{font-weight:800}}
